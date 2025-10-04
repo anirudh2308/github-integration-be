@@ -11,7 +11,22 @@ const User = require('../models/user');
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 
-// Helper to get access token
+// Helper to fetch all pages from GitHub API
+async function fetchAllPages(url, token) {
+  let results = [];
+  let page = 1;
+  while (true) {
+    const res = await axios.get(`${url}?per_page=100&page=${page}`, {
+      headers: { Authorization: `token ${token}` }
+    });
+    if (!res.data || res.data.length === 0) break;
+    results.push(...res.data);
+    page++;
+  }
+  return results;
+}
+
+// Helper: get the stored access token
 async function getAccessToken() {
   const integration = await GithubIntegration.findOne();
   if (!integration) throw new Error('No GitHub integration found');
@@ -25,7 +40,7 @@ exports.redirectToGithub = (req, res) => {
   res.redirect(url);
 };
 
-// 2️⃣ GitHub OAuth callback
+// 2️⃣ Handle GitHub OAuth callback
 exports.githubCallback = async (req, res) => {
   const code = req.query.code;
   if (!code) return res.status(400).send('No code provided');
@@ -33,24 +48,18 @@ exports.githubCallback = async (req, res) => {
   try {
     const tokenResponse = await axios.post(
       'https://github.com/login/oauth/access_token',
-      {
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        code
-      },
+      { client_id: CLIENT_ID, client_secret: CLIENT_SECRET, code },
       { headers: { Accept: 'application/json' } }
     );
 
     const { access_token, scope, token_type } = tokenResponse.data;
 
-    // Get user info
     const userResponse = await axios.get('https://api.github.com/user', {
       headers: { Authorization: `token ${access_token}` }
     });
 
     const { id: githubId, login } = userResponse.data;
 
-    // Upsert integration
     await GithubIntegration.findOneAndUpdate(
       { githubId },
       { githubId, login, access_token, scope, token_type, connectedAt: new Date(), userProfile: userResponse.data },
@@ -76,7 +85,7 @@ exports.getStatus = async (req, res) => {
   }
 };
 
-// 4️⃣ Remove integration
+// 4️⃣ Remove integration + all GitHub data
 exports.removeIntegration = async (req, res) => {
   try {
     await GithubIntegration.deleteMany({});
@@ -93,17 +102,13 @@ exports.removeIntegration = async (req, res) => {
   }
 };
 
-// 5️⃣ Resync integration
+// 5️⃣ Resync integration: fetch orgs, repos, commits, pulls, issues, users
 exports.resyncIntegration = async (req, res) => {
   try {
     const token = await getAccessToken();
-    console.log(token)
+
     // Fetch orgs
-    const orgsRes = await axios.get('https://api.github.com/user/orgs', {
-      headers: { Authorization: `token ${token}` }
-    });
-    const orgs = orgsRes.data;
-    console.log(orgs)
+    const orgs = await fetchAllPages('https://api.github.com/user/orgs', token);
 
     // Clear old data
     await Org.deleteMany({});
@@ -124,13 +129,8 @@ exports.resyncIntegration = async (req, res) => {
     })));
 
     for (const org of orgs) {
-      // Repos
-      console.log(org)
-      const reposRes = await axios.get(`https://api.github.com/orgs/${org.login}/repos`, {
-        headers: { Authorization: `token ${token}` }
-      });
-      const repos = reposRes.data;
-      console.log(repos)
+      // Fetch all repos for org
+      const repos = await fetchAllPages(`https://api.github.com/orgs/${org.login}/repos`, token);
       await Repo.insertMany(repos.map(r => ({
         id: r.id,
         name: r.name,
@@ -141,14 +141,9 @@ exports.resyncIntegration = async (req, res) => {
         raw: r
       })));
 
-      // For each repo → commits, pulls, issues
       for (const repo of repos) {
         // Commits
-        const commitsRes = await axios.get(`https://api.github.com/repos/${org.login}/${repo.name}/commits`, {
-          headers: { Authorization: `token ${token}` }
-        });
-        const commits = commitsRes.data;
-        console.log(commits)
+        const commits = await fetchAllPages(`https://api.github.com/repos/${org.login}/${repo.name}/commits`, token);
         await Commit.insertMany(commits.map(c => ({
           sha: c.sha,
           org: org.login,
@@ -160,11 +155,7 @@ exports.resyncIntegration = async (req, res) => {
         })));
 
         // Pulls
-        const pullsRes = await axios.get(`https://api.github.com/repos/${org.login}/${repo.name}/pulls`, {
-          headers: { Authorization: `token ${token}` }
-        });
-        const pulls = pullsRes.data;
-        console.log(pulls)
+        const pulls = await fetchAllPages(`https://api.github.com/repos/${org.login}/${repo.name}/pulls`, token);
         await Pull.insertMany(pulls.map(p => ({
           id: p.id,
           org: org.login,
@@ -177,11 +168,7 @@ exports.resyncIntegration = async (req, res) => {
         })));
 
         // Issues
-        const issuesRes = await axios.get(`https://api.github.com/repos/${org.login}/${repo.name}/issues`, {
-          headers: { Authorization: `token ${token}` }
-        });
-        const issues = issuesRes.data;
-        console.log(issues)
+        const issues = await fetchAllPages(`https://api.github.com/repos/${org.login}/${repo.name}/issues`, token);
         await Issue.insertMany(issues.map(i => ({
           id: i.id,
           org: org.login,
@@ -196,11 +183,7 @@ exports.resyncIntegration = async (req, res) => {
 
       // Users in org
       try {
-        const usersRes = await axios.get(`https://api.github.com/orgs/${org.login}/members`, {
-          headers: { Authorization: `token ${token}` }
-        });
-        const users = usersRes.data;
-        console.log(users)
+        const users = await fetchAllPages(`https://api.github.com/orgs/${org.login}/members`, token);
         await User.insertMany(users.map(u => ({
           id: u.id,
           login: u.login,
