@@ -9,7 +9,6 @@ const GithubIntegration = require('./models/githubIntegration');
 
 // Routes
 const githubRoutes = require('./routes/github');
-const repoRoutes = require('./routes/repo');
 
 const app = express();
 
@@ -18,8 +17,7 @@ app.use(cors({ origin: process.env.FRONTEND_URL }));
 app.use(express.json());
 
 // Routes
-app.use('/auth', githubRoutes);
-app.use('/repo', repoRoutes);
+app.use('/auth/github', githubRoutes);
 
 // Test route
 app.get('/test-model', async (req, res) => {

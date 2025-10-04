@@ -1,24 +1,36 @@
-// src/controllers/authController.js
+// src/controllers/githubController.js
 const axios = require('axios');
 const GithubIntegration = require('../models/githubIntegration');
+const Org = require('../models/org');
+const Repo = require('../models/repo');
+const Commit = require('../models/commit');
+const Pull = require('../models/pull');
+const Issue = require('../models/issue');
+const User = require('../models/user');
 
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 
-// Step 1: redirect user to GitHub OAuth page
+// Helper to get access token
+async function getAccessToken() {
+  const integration = await GithubIntegration.findOne();
+  if (!integration) throw new Error('No GitHub integration found');
+  return integration.access_token;
+}
+
+// 1️⃣ Redirect user to GitHub OAuth
 exports.redirectToGithub = (req, res) => {
   const redirect_uri = encodeURIComponent('http://localhost:3000/auth/github/callback');
-  const url = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${redirect_uri}&scope=repo,user`;
+  const url = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${redirect_uri}&scope=repo,user,read:org,read:user`;
   res.redirect(url);
 };
 
-// Step 2: handle GitHub callback
+// 2️⃣ GitHub OAuth callback
 exports.githubCallback = async (req, res) => {
   const code = req.query.code;
   if (!code) return res.status(400).send('No code provided');
 
   try {
-    // Exchange code for access token
     const tokenResponse = await axios.post(
       'https://github.com/login/oauth/access_token',
       {
@@ -38,7 +50,7 @@ exports.githubCallback = async (req, res) => {
 
     const { id: githubId, login } = userResponse.data;
 
-    // Upsert integration in MongoDB
+    // Upsert integration
     await GithubIntegration.findOneAndUpdate(
       { githubId },
       { githubId, login, access_token, scope, token_type, connectedAt: new Date(), userProfile: userResponse.data },
@@ -52,7 +64,7 @@ exports.githubCallback = async (req, res) => {
   }
 };
 
-// Get integration status
+// 3️⃣ Get integration status
 exports.getStatus = async (req, res) => {
   try {
     const integration = await GithubIntegration.findOne();
@@ -64,10 +76,16 @@ exports.getStatus = async (req, res) => {
   }
 };
 
-// Remove integration
+// 4️⃣ Remove integration
 exports.removeIntegration = async (req, res) => {
   try {
     await GithubIntegration.deleteMany({});
+    await Org.deleteMany({});
+    await Repo.deleteMany({});
+    await Commit.deleteMany({});
+    await Pull.deleteMany({});
+    await Issue.deleteMany({});
+    await User.deleteMany({});
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -75,23 +93,128 @@ exports.removeIntegration = async (req, res) => {
   }
 };
 
-// Resync integration
+// 5️⃣ Resync integration
 exports.resyncIntegration = async (req, res) => {
   try {
-    const integration = await GithubIntegration.findOne();
-    if (!integration) return res.status(400).json({ error: 'No integration found' });
-
-    const token = integration.access_token;
-
-    // Example: fetch orgs, could extend to repos/pulls/issues
+    const token = await getAccessToken();
+    console.log(token)
+    // Fetch orgs
     const orgsRes = await axios.get('https://api.github.com/user/orgs', {
       headers: { Authorization: `token ${token}` }
     });
+    const orgs = orgsRes.data;
+    console.log(orgs)
 
-    // Store orgs in DB if desired, or just confirm fetch
-    // await OrgModel.insertMany(orgsRes.data);
+    // Clear old data
+    await Org.deleteMany({});
+    await Repo.deleteMany({});
+    await Commit.deleteMany({});
+    await Pull.deleteMany({});
+    await Issue.deleteMany({});
+    await User.deleteMany({});
 
-    res.json({ success: true, orgsFetched: orgsRes.data.length });
+    // Save orgs
+    await Org.insertMany(orgs.map(o => ({
+      id: o.id,
+      login: o.login,
+      url: o.url,
+      description: o.description,
+      type: o.type,
+      raw: o
+    })));
+
+    for (const org of orgs) {
+      // Repos
+      console.log(org)
+      const reposRes = await axios.get(`https://api.github.com/orgs/${org.login}/repos`, {
+        headers: { Authorization: `token ${token}` }
+      });
+      const repos = reposRes.data;
+      console.log(repos)
+      await Repo.insertMany(repos.map(r => ({
+        id: r.id,
+        name: r.name,
+        full_name: r.full_name,
+        org: org.login,
+        private: r.private,
+        url: r.url,
+        raw: r
+      })));
+
+      // For each repo → commits, pulls, issues
+      for (const repo of repos) {
+        // Commits
+        const commitsRes = await axios.get(`https://api.github.com/repos/${org.login}/${repo.name}/commits`, {
+          headers: { Authorization: `token ${token}` }
+        });
+        const commits = commitsRes.data;
+        console.log(commits)
+        await Commit.insertMany(commits.map(c => ({
+          sha: c.sha,
+          org: org.login,
+          repo: repo.name,
+          message: c.commit.message,
+          author: c.commit.author,
+          committer: c.commit.committer,
+          raw: c
+        })));
+
+        // Pulls
+        const pullsRes = await axios.get(`https://api.github.com/repos/${org.login}/${repo.name}/pulls`, {
+          headers: { Authorization: `token ${token}` }
+        });
+        const pulls = pullsRes.data;
+        console.log(pulls)
+        await Pull.insertMany(pulls.map(p => ({
+          id: p.id,
+          org: org.login,
+          repo: repo.name,
+          number: p.number,
+          title: p.title,
+          user: p.user,
+          state: p.state,
+          raw: p
+        })));
+
+        // Issues
+        const issuesRes = await axios.get(`https://api.github.com/repos/${org.login}/${repo.name}/issues`, {
+          headers: { Authorization: `token ${token}` }
+        });
+        const issues = issuesRes.data;
+        console.log(issues)
+        await Issue.insertMany(issues.map(i => ({
+          id: i.id,
+          org: org.login,
+          repo: repo.name,
+          number: i.number,
+          title: i.title,
+          user: i.user,
+          state: i.state,
+          raw: i
+        })));
+      }
+
+      // Users in org
+      try {
+        const usersRes = await axios.get(`https://api.github.com/orgs/${org.login}/members`, {
+          headers: { Authorization: `token ${token}` }
+        });
+        const users = usersRes.data;
+        console.log(users)
+        await User.insertMany(users.map(u => ({
+          id: u.id,
+          login: u.login,
+          org: org.login,
+          url: u.url,
+          type: u.type,
+          raw: u
+        })));
+      } catch (err) {
+        console.warn(`Failed to fetch members for org ${org.login}: ${err.message}`);
+      }
+    }
+
+    res.json({ success: true, orgsFetched: orgs.length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Resync failed' });
