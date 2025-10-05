@@ -33,28 +33,36 @@ exports.getEntityData = async (req, res) => {
 		const skip = (parseInt(page) - 1) * parseInt(limit);
 		const sort = { [sortField]: sortOrder === "asc" ? 1 : -1 };
 
-		// Build search filter
-		let searchFilter = {};
-		if (search) {
-			const stringKeys = Object.keys(Model.schema.paths).filter(
-				(key) => Model.schema.paths[key].instance === "String"
-			);
+		const cleanedSearch = search.trim();
+		const paths = Object.keys(Model.schema.paths).filter(
+			(key) => !["_id", "__v"].includes(key)
+		);
 
-			const numberKeys = Object.keys(Model.schema.paths).filter(
-				(key) => Model.schema.paths[key].instance === "Number"
-			);
+		const searchFilter = {
+			$or: paths.flatMap((key) => {
+				const fieldType = Model.schema.paths[key].instance;
 
-			searchFilter = {
-				$or: [
-					...stringKeys.map((key) => ({
-						[key]: { $regex: search, $options: "i" },
-					})),
-					...numberKeys
-						.filter((key) => !isNaN(search))
-						.map((key) => ({ [key]: Number(search) })),
-				],
-			};
-		}
+				if (fieldType === "String") {
+					return [{ [key]: { $regex: cleanedSearch, $options: "i" } }];
+				}
+
+				if (fieldType === "Number") {
+					return [
+						{
+							$expr: {
+								$regexMatch: {
+									input: { $toString: `$${key}` },
+									regex: cleanedSearch,
+									options: "i",
+								},
+							},
+						},
+					];
+				}
+
+				return [];
+			}),
+		};
 
 		const [total, data] = await Promise.all([
 			Model.countDocuments(searchFilter),
