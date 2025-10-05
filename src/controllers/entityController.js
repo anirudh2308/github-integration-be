@@ -60,6 +60,21 @@ exports.getEntityData = async (req, res) => {
 					];
 				}
 
+				if (fieldType === "Date") {
+					return [
+						{
+							$expr: {
+								$regexMatch: {
+									input: {
+										$dateToString: { format: "%Y-%m-%d", date: `$${key}` },
+									},
+									regex: cleanedSearch,
+									options: "i",
+								},
+							},
+						},
+					];
+				}
 				return [];
 			}),
 		};
