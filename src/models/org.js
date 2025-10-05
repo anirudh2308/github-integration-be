@@ -6,7 +6,6 @@ const orgSchema = new mongoose.Schema({
   url: { type: String },
   description: { type: String },
   type: { type: String },
-  raw: { type: Object } // Store full API response if needed
-});
+}, { versionKey: false });
 
 module.exports = mongoose.model('Org', orgSchema);

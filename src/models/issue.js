@@ -6,9 +6,9 @@ const issueSchema = new mongoose.Schema({
   repo: { type: String },
   number: { type: Number },
   title: { type: String },
-  user: { type: Object },
-  state: { type: String },
-  raw: { type: Object }
-});
+  user_id: { type: Number },
+  user_login: { type: String },
+  state: { type: String }
+}, { versionKey: false });
 
 module.exports = mongoose.model('Issue', issueSchema);

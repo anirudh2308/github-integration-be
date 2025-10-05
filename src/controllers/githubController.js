@@ -124,8 +124,7 @@ exports.resyncIntegration = async (req, res) => {
       login: o.login,
       url: o.url,
       description: o.description,
-      type: o.type,
-      raw: o
+      type: o.type
     })));
 
     for (const org of orgs) {
@@ -137,8 +136,7 @@ exports.resyncIntegration = async (req, res) => {
         full_name: r.full_name,
         org: org.login,
         private: r.private,
-        url: r.url,
-        raw: r
+        url: r.url
       })));
 
       for (const repo of repos) {
@@ -149,9 +147,12 @@ exports.resyncIntegration = async (req, res) => {
           org: org.login,
           repo: repo.name,
           message: c.commit.message,
-          author: c.commit.author,
-          committer: c.commit.committer,
-          raw: c
+          author_name: c.commit.author.name,
+          author_email: c.commit.author.email,
+          committer_name: c.commit.committer.name,
+          committer_email: c.commit.committer.email,
+          url: c.html_url,
+          date: c.commit.author.date
         })));
 
         // Pulls
@@ -162,9 +163,9 @@ exports.resyncIntegration = async (req, res) => {
           repo: repo.name,
           number: p.number,
           title: p.title,
-          user: p.user,
-          state: p.state,
-          raw: p
+          user_id: p.user.id,
+          user_login: p.user.login,
+          state: p.state
         })));
 
         // Issues
@@ -175,9 +176,9 @@ exports.resyncIntegration = async (req, res) => {
           repo: repo.name,
           number: i.number,
           title: i.title,
-          user: i.user,
-          state: i.state,
-          raw: i
+          user_id: p.user.id,
+          user_login: p.user.login,
+          state: i.state
         })));
       }
 
@@ -189,8 +190,7 @@ exports.resyncIntegration = async (req, res) => {
           login: u.login,
           org: org.login,
           url: u.url,
-          type: u.type,
-          raw: u
+          type: u.type
         })));
       } catch (err) {
         console.warn(`Failed to fetch members for org ${org.login}: ${err.message}`);

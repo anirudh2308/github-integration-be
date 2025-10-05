@@ -5,9 +5,12 @@ const commitSchema = new mongoose.Schema({
   org: { type: String },
   repo: { type: String },
   message: { type: String },
-  author: { type: Object },
-  committer: { type: Object },
-  raw: { type: Object }
-});
+  author_name: { type: String },
+  author_email: { type: String },
+  committer_name: { type: String },
+  committer_email: { type: String },
+  url: { type: String },
+  date: { type: Date }
+}, { versionKey: false });
 
 module.exports = mongoose.model('Commit', commitSchema);

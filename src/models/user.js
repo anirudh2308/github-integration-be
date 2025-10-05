@@ -5,8 +5,7 @@ const userSchema = new mongoose.Schema({
   login: { type: String },
   org: { type: String },
   url: { type: String },
-  type: { type: String },
-  raw: { type: Object }
-});
+  type: { type: String }
+}, { versionKey: false });
 
 module.exports = mongoose.model('User', userSchema);
