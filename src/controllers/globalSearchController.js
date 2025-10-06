@@ -1,4 +1,3 @@
-// src/controllers/entityController.js
 const Org = require("../models/org");
 const Repo = require("../models/repo");
 const Commit = require("../models/commit");
@@ -15,7 +14,6 @@ const entityMap = {
 	users: User,
 };
 
-// 🔍 GLOBAL SEARCH across all collections
 exports.fetchAllCollections = async (req, res) => {
 	try {
 		const {
@@ -32,7 +30,6 @@ exports.fetchAllCollections = async (req, res) => {
 
 		const results = {};
 
-		// Run searches in parallel for all entities
 		await Promise.all(
 			Object.entries(entityMap).map(async ([entity, Model]) => {
 				const paths = Object.keys(Model.schema.paths).filter(

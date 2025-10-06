@@ -1,4 +1,3 @@
-// src/controllers/entityController.js
 const Org = require("../models/org");
 const Repo = require("../models/repo");
 const Commit = require("../models/commit");
@@ -6,7 +5,6 @@ const Pull = require("../models/pull");
 const Issue = require("../models/issue");
 const User = require("../models/user");
 
-// Map entity name → Mongoose model
 const entityMap = {
 	orgs: Org,
 	repos: Repo,
@@ -25,7 +23,7 @@ exports.getEntityData = async (req, res) => {
 			sortField = "id",
 			sortOrder = "asc",
 			search = "",
-			filters = "{}", // AG Grid sends this as JSON string
+			filters = "{}",
 		} = req.query;
 
 		const Model = entityMap[entity.toLowerCase()];
@@ -36,7 +34,6 @@ exports.getEntityData = async (req, res) => {
 		const cleanedSearch = search.trim();
 		const parsedFilters = JSON.parse(filters);
 
-		// --- Build global search filter ---
 		const paths = Object.keys(Model.schema.paths).filter(
 			(key) => !["_id", "__v"].includes(key)
 		);
@@ -77,7 +74,6 @@ exports.getEntityData = async (req, res) => {
 			  }
 			: {};
 
-		// --- Build per-column filter ---
 		const columnFilter = {};
 		for (const key in parsedFilters) {
 			const f = parsedFilters[key];
@@ -94,7 +90,6 @@ exports.getEntityData = async (req, res) => {
 					columnFilter[key] = { $lt: Number(f.filter) };
 				else if (f.type === "greaterThan")
 					columnFilter[key] = { $gt: Number(f.filter) };
-				// Add more AG Grid number filter types as needed
 			} else if (fieldType === "Date") {
 				const dateVal = new Date(f.filter);
 				if (!isNaN(dateVal.getTime())) {
@@ -106,7 +101,6 @@ exports.getEntityData = async (req, res) => {
 			}
 		}
 
-		// --- Combine search + column filters ---
 		const finalQuery =
 			Object.keys(searchFilter).length > 0
 				? Object.keys(columnFilter).length > 0
