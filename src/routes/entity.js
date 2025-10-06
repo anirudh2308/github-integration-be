@@ -1,4 +1,3 @@
-// src/routes/entity.js
 const express = require("express");
 const router = express.Router();
 const entityController = require("../controllers/entityController");

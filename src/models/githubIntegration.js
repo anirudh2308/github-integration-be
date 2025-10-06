@@ -3,14 +3,14 @@ const { Schema } = mongoose;
 
 const GithubIntegrationSchema = new Schema(
 	{
-		githubId: { type: Number, required: true, unique: true }, // GitHub user ID
-		login: { type: String }, // GitHub username
-		access_token: { type: String, required: true }, // OAuth token
+		githubId: { type: Number, required: true, unique: true },
+		login: { type: String },
+		access_token: { type: String, required: true },
 		scope: { type: String },
 		token_type: { type: String },
-		connectedAt: { type: Date, default: Date.now }, // When integration was done
-		userProfile: { type: Schema.Types.Mixed }, // Store full GitHub profile if needed
-		orgsSyncedAt: { type: Date }, // Optional: track last sync
+		connectedAt: { type: Date, default: Date.now },
+		userProfile: { type: Schema.Types.Mixed },
+		orgsSyncedAt: { type: Date },
 	},
 	{ strict: false }
 );
@@ -18,5 +18,5 @@ const GithubIntegrationSchema = new Schema(
 module.exports = mongoose.model(
 	"GithubIntegration",
 	GithubIntegrationSchema,
-	"github-integration" // collection name in MongoDB
+	"github-integration"
 );
