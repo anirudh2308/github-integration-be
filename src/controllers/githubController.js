@@ -15,7 +15,6 @@ const User = require("../models/user");
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 
-// 1️⃣ Redirect user to GitHub OAuth
 exports.redirectToGithub = (req, res) => {
 	const redirect_uri = encodeURIComponent(
 		"http://localhost:3000/auth/github/callback"
@@ -24,7 +23,6 @@ exports.redirectToGithub = (req, res) => {
 	res.redirect(url);
 };
 
-// 2️⃣ Handle GitHub OAuth callback
 exports.githubCallback = async (req, res) => {
 	const code = req.query.code;
 	if (!code) return res.status(400).send("No code provided");
@@ -65,7 +63,6 @@ exports.githubCallback = async (req, res) => {
 	}
 };
 
-// 3️⃣ Get integration status
 exports.getStatus = async (req, res) => {
 	try {
 		const integration = await GithubIntegration.findOne();
@@ -82,7 +79,6 @@ exports.getStatus = async (req, res) => {
 	}
 };
 
-// 4️⃣ Remove integration + all GitHub data
 exports.removeIntegration = async (req, res) => {
 	try {
 		await GithubIntegration.deleteMany({});
@@ -99,15 +95,12 @@ exports.removeIntegration = async (req, res) => {
 	}
 };
 
-// 5️⃣ Resync integration: fetch orgs, repos, commits, pulls, issues, users
 exports.resyncIntegration = async (req, res) => {
 	try {
 		const token = await getAccessToken();
 
-		// Fetch orgs
 		const orgs = await fetchAllPages("https://api.github.com/user/orgs", token);
 
-		// Clear old data
 		await Org.deleteMany({});
 		await Repo.deleteMany({});
 		await Commit.deleteMany({});
@@ -115,7 +108,6 @@ exports.resyncIntegration = async (req, res) => {
 		await Issue.deleteMany({});
 		await User.deleteMany({});
 
-		// Save orgs
 		await Org.insertMany(
 			orgs.map((o) => ({
 				id: o.id,
@@ -127,7 +119,6 @@ exports.resyncIntegration = async (req, res) => {
 		);
 
 		for (const org of orgs) {
-			// Fetch all repos for org
 			const repos = await fetchAllPages(
 				`https://api.github.com/orgs/${org.login}/repos`,
 				token
@@ -144,7 +135,6 @@ exports.resyncIntegration = async (req, res) => {
 			);
 
 			for (const repo of repos) {
-				// Commits
 				const commits = await fetchAllPages(
 					`https://api.github.com/repos/${org.login}/${repo.name}/commits`,
 					token
@@ -164,7 +154,6 @@ exports.resyncIntegration = async (req, res) => {
 					}))
 				);
 
-				// Pulls
 				const pulls = await fetchAllPages(
 					`https://api.github.com/repos/${org.login}/${repo.name}/pulls`,
 					token
@@ -182,7 +171,6 @@ exports.resyncIntegration = async (req, res) => {
 					}))
 				);
 
-				// Issues
 				const issues = await fetchAllPages(
 					`https://api.github.com/repos/${org.login}/${repo.name}/issues`,
 					token
@@ -201,7 +189,6 @@ exports.resyncIntegration = async (req, res) => {
 				);
 			}
 
-			// Users in org
 			try {
 				const users = await fetchAllPages(
 					`https://api.github.com/orgs/${org.login}/members`,
