@@ -1,4 +1,8 @@
-// src/controllers/githubController.js
+const {
+	fetchAllPages,
+	getAccessToken,
+} = require("../helpers/githubHelpers.js");
+
 const axios = require("axios");
 const GithubIntegration = require("../models/githubIntegration");
 const Org = require("../models/org");
@@ -10,28 +14,6 @@ const User = require("../models/user");
 
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
-
-// Helper to fetch all pages from GitHub API
-async function fetchAllPages(url, token) {
-	let results = [];
-	let page = 1;
-	while (true) {
-		const res = await axios.get(`${url}?per_page=100&page=${page}`, {
-			headers: { Authorization: `token ${token}` },
-		});
-		if (!res.data || res.data.length === 0) break;
-		results.push(...res.data);
-		page++;
-	}
-	return results;
-}
-
-// Helper: get the stored access token
-async function getAccessToken() {
-	const integration = await GithubIntegration.findOne();
-	if (!integration) throw new Error("No GitHub integration found");
-	return integration.access_token;
-}
 
 // 1️⃣ Redirect user to GitHub OAuth
 exports.redirectToGithub = (req, res) => {
