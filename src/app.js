@@ -10,6 +10,7 @@ const GithubIntegration = require("./models/githubIntegration");
 // Routes
 const githubRoutes = require("./routes/github");
 const entityRoutes = require("./routes/entity");
+const globalSearchRoutes = require("./routes/globalSearch");
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use(express.json());
 // Routes
 app.use("/auth/github", githubRoutes);
 app.use("/api/entity", entityRoutes);
+app.use("/api/globalSearch", globalSearchRoutes);
 
 // Test route
 app.get("/test-model", async (req, res) => {
