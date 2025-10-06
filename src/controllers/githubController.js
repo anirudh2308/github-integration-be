@@ -194,8 +194,8 @@ exports.resyncIntegration = async (req, res) => {
 						repo: repo.name,
 						number: i.number,
 						title: i.title,
-						user_id: p.user.id,
-						user_login: p.user.login,
+						user_id: i.user.id,
+						user_login: i.user.login,
 						state: i.state,
 					}))
 				);
